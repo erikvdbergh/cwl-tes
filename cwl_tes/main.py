@@ -71,7 +71,7 @@ def main(args=None):
     if not parsed_args.rm_container:
         log.warning("arg: 'leave_container' has no effect in cwl-tes")
 
-    tes_workflow = TESWorkflow(parsed_args.tes, vars(parsed_args))
+    tes_workflow = TESWorkflow(parsed_args.tes, parsed_args.remote, vars(parsed_args))
 
     # setup signal handler
     def signal_handler(*args):
@@ -102,6 +102,12 @@ def add_args(parser):
         "--tes",
         type=str,
         help="GA4GH TES Service URL"
+    )
+    parser.add_argument(
+        "--remote",
+        type=str,
+        help="Remote workdir for files",
+        default=""
     )
     return parser
 
