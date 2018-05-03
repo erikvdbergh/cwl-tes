@@ -1,0 +1,3 @@
+input:
+  class: File
+  location: https://raw.githubusercontent.com/EMBL-EBI-TSI/TESK/master/README.md
