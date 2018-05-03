@@ -24,10 +24,11 @@ log = logging.getLogger("tes-backend")
 
 class TESWorkflow(object):
 
-    def __init__(self, url, kwargs):
+    def __init__(self, url, remote, kwargs):
         self.threads = []
         self.kwargs = kwargs
         self.client = tes.HTTPClient(url)
+        self.remote = remote
         if kwargs.get("basedir") is not None:
             self.basedir = kwargs.get("basedir")
         else:
@@ -431,9 +432,12 @@ class TESTask(object):
 
     def output2url(self, path):
         if path is not None:
-            return file_uri(
-                self.fs_access.join(self.outdir, os.path.basename(path))
-            )
+            if self.tes_workflow.remote != "":
+                return self.tes_workflow.remote + self.outdir + '/' + os.path.basename(path)
+            else:
+                return file_uri(
+                    self.fs_access.join(self.outdir, os.path.basename(path))
+                )
         return None
 
     def output2path(self, path):
