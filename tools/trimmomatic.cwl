@@ -4,16 +4,13 @@ cwlVersion: v1.0
 class: CommandLineTool
 
 hints:
-  SoftwareRequirement:
-    packages:
-      trimmomatic:
-        specs: [ "https://identifiers.org/rrid/RRID:SCR_011848" ]
-        version: [ "0.32", "0.35", "0.36" ]
+  DockerRequirement:
+    dockerPull: eu.gcr.io/tes-wes/trimmomatic
 
 requirements:
  ResourceRequirement:
-   ramMin: 10240
-   coresMin: 8
+   ramMin: 256
+   coresMin: 1
  SchemaDefRequirement:
    types:
     - $import: trimmomatic-end_mode.yaml
@@ -261,7 +258,7 @@ outputs:
            }
          }
 
-baseCommand: [ java, org.usadellab.trimmomatic.Trimmomatic ]
+baseCommand: [ trimmomatic ]
 
 arguments:
 - valueFrom: trim.log

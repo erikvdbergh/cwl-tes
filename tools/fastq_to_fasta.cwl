@@ -6,11 +6,8 @@ requirements:
     coresMax: 1
     ramMin: 100  # just a default, could be lowered
 hints:
-  SoftwareRequirement:
-    packages:
-      biopython:
-        specs: [ "https://identifiers.org/rrid/RRID:SCR_007173" ]
-        version: [ "1.65", "1.66", "1.69" ]
+  DockerRequirement:
+    dockerPull: eu.gcr.io/tes-wes/biopython
 
 inputs:
   fastq:
@@ -20,7 +17,7 @@ inputs:
 
 stdin: $(inputs.fastq.path)
 
-baseCommand: [ python ]
+baseCommand: [ python3 ]
 
 arguments:
   - valueFrom: |

@@ -7,7 +7,11 @@ label: replace problem characters from FASTA headers with dashes
 requirements:
   ResourceRequirement:
     coresMax: 1
-    ramMin: 1024  # just a default, could be lowered
+    ramMin: 256  # just a default, could be lowered
+
+hints:
+  DockerRequirement:
+    dockerPull: alpine
 
 inputs:
   sequences:
