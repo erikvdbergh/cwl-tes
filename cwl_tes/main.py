@@ -71,7 +71,7 @@ def main(args=None):
     if not parsed_args.rm_container:
         log.warning("arg: 'leave_container' has no effect in cwl-tes")
 
-    tes_workflow = TESWorkflow(parsed_args.tes, parsed_args.remote, vars(parsed_args))
+    tes_workflow = TESWorkflow(parsed_args.tes, parsed_args.remote, parsed_args.remote_auth, parsed_args.tes_auth, vars(parsed_args))
 
     # setup signal handler
     def signal_handler(*args):
@@ -108,6 +108,18 @@ def add_args(parser):
         type=str,
         help="Remote workdir for files",
         default=""
+    )
+    parser.add_argument(
+        "--remote-auth",
+        type=str,
+        help="Some auth for the remote workdir for files",
+        default=""
+    )
+    parser.add_argument(
+        "--tes-auth",
+        type=str,
+        help="A token that will be passed in the 'authentication: Bearer' header for TES endpoint calls",
+        default=None
     )
     return parser
 
