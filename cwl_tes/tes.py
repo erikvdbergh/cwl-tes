@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+import traceback
 import logging
 import os
 import tempfile
@@ -24,11 +25,18 @@ log = logging.getLogger("tes-backend")
 
 class TESWorkflow(object):
 
-    def __init__(self, url, remote, kwargs):
+    def __init__(self, url, remote, remote_auth, tes_auth, kwargs):
         self.threads = []
         self.kwargs = kwargs
-        self.client = tes.HTTPClient(url)
+
+        headers = {'Content-Type' : 'application/json'}
+        if tes_auth is not None:
+          headers['authorization'] = 'Bearer '+tes_auth
+        self.client = tes.HTTPClient(url, headers=headers)
+
         self.remote = remote
+        self.remote_auth = remote_auth
+
         if kwargs.get("basedir") is not None:
             self.basedir = kwargs.get("basedir")
         else:
@@ -96,7 +104,9 @@ class TESWorkflow(object):
             raise e
         except Exception as e:
             log.error("Got exception")
-            raise WorkflowException(str(e))
+            traceback.print_exc()
+            #raise WorkflowException(str(e))
+            raise
 
         # wait for all processes to finish
         self.wait()
@@ -433,7 +443,7 @@ class TESTask(object):
     def output2url(self, path):
         if path is not None:
             if self.tes_workflow.remote != "":
-                return self.tes_workflow.remote + self.outdir + '/' + os.path.basename(path)
+                return self.tes_workflow.remote + self.outdir + os.path.basename(path)
             else:
                 return file_uri(
                     self.fs_access.join(self.outdir, os.path.basename(path))
