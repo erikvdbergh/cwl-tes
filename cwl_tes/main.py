@@ -71,7 +71,7 @@ def main(args=None):
     if not parsed_args.rm_container:
         log.warning("arg: 'leave_container' has no effect in cwl-tes")
 
-    tes_workflow = TESWorkflow(parsed_args.tes, parsed_args.remote, parsed_args.remote_auth, parsed_args.tes_auth, vars(parsed_args))
+    tes_workflow = TESWorkflow(parsed_args.tes, vars(parsed_args), parsed_args.remote, parsed_args.remote_auth, parsed_args.tes_auth)
 
     # setup signal handler
     def signal_handler(*args):
