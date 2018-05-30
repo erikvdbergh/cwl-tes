@@ -1,8 +1,8 @@
-reads:
-  class: File
-  location: https://object.pouta.csc.fi/swift/v1/AUTH_ffdea9c54c8b4010a7f0bfd5c5bada00/EMBL-TESK/example_ERP000554.fastq?temp_url_sig=08bfefa83c1491023903e3b6a6f9fa428e5ec6a0&temp_url_expires=1526998974
-  format: edam:format_1930
 trimmed_reads:
   class: File
   location: https://object.pouta.csc.fi/swift/v1/AUTH_ffdea9c54c8b4010a7f0bfd5c5bada00/EMBL-TESK/example_ERP000554_trimmed.fastq?temp_url_sig=7287ba9541c2a0fc25fda1f54bc680365a102d2d&temp_url_expires=1527155408
+  format: edam:format_1930
+reads:
+  class: File
+  location: https://object.pouta.csc.fi/swift/v1/AUTH_ffdea9c54c8b4010a7f0bfd5c5bada00/EMBL-TESK/example_ERP000554.fastq?temp_url_sig=1cf61517370d9cc0557e2e232efd460a58cfa58d&temp_url_expires=1527604629
   format: edam:format_1930
