@@ -8,6 +8,7 @@ import shutil
 import tes
 import threading
 import time
+from functools import partial, cmp_to_key
 
 from builtins import str
 from cwltool.draft2tool import CommandLineTool
@@ -25,7 +26,7 @@ log = logging.getLogger("tes-backend")
 
 class TESWorkflow(object):
 
-    def __init__(self, url, remote, remote_auth, tes_auth, kwargs):
+    def __init__(self, url, kwargs, remote=None, remote_auth=None, tes_auth=None):
         self.threads = []
         self.kwargs = kwargs
 
@@ -146,6 +147,8 @@ class TESWorkflow(object):
         for t in self.threads:
             t.join()
 
+def revmap_file(builder, outdir, f):
+  return f
 
 class TESCommandLineTool(CommandLineTool):
 
@@ -160,6 +163,156 @@ class TESCommandLineTool(CommandLineTool):
 
     def makePathMapper(self, reffiles, stagedir, **kwargs):
         return PathMapper(reffiles, kwargs["basedir"], stagedir)
+
+    def collect_output(self, schema, builder, outdir, fs_access, compute_checksum=True):
+      return None
+
+    def collect_output_original(self, schema, builder, outdir, fs_access, compute_checksum=True):
+      r = []  # type: List[Any]
+      debug = log.isEnabledFor(logging.DEBUG)
+      if "outputBinding" in schema:
+          binding = schema["outputBinding"]
+          globpatterns = []  # type: List[Text]
+
+          revmap = partial(revmap_file, builder, outdir)
+
+          if "glob" in binding:
+              log.debug('in glob function')
+              with SourceLine(binding, "glob", WorkflowException, debug):
+                  for gb in aslist(binding["glob"]):
+                      gb = builder.do_eval(gb)
+                      if gb:
+                          globpatterns.extend(aslist(gb))
+
+                  for gb in globpatterns:
+                      if gb.startswith(outdir):
+                          gb = gb[len(outdir) + 1:]
+                      elif gb == ".":
+                          gb = outdir
+                      elif gb.startswith("/"):
+                          raise WorkflowException(
+                              "glob patterns must not start with '/'")
+                      try:
+                          prefix = fs_access.glob(outdir)
+                          r.extend([{"location": g,
+                                     "path": fs_access.join(builder.outdir,
+                                         g[len(prefix[0])+1:]),
+                                     "basename": os.path.basename(g),
+                                     "nameroot": os.path.splitext(
+                                         os.path.basename(g))[0],
+                                     "nameext": os.path.splitext(
+                                         os.path.basename(g))[1],
+                                     "class": "File" if fs_access.isfile(g)
+                                     else "Directory"}
+                                    for g in sorted(fs_access.glob(
+                                        fs_access.join(outdir, gb)),
+                                        key=cmp_to_key(cast(
+                                            Callable[[Text, Text],
+                                                int], locale.strcoll)))])
+                      except (OSError, IOError) as e:
+                          log.warning(Text(e))
+                      except:
+                          log.error("Unexpected error from fs_access", exc_info=True)
+                          raise
+
+              for files in r:
+                  rfile = files.copy()
+                  revmap(rfile)
+                  if files["class"] == "Directory":
+                      ll = builder.loadListing or (binding and binding.get("loadListing"))
+                      if ll and ll != "no_listing":
+                          get_listing(fs_access, files, (ll == "deep_listing"))
+                  else:
+                      with fs_access.open(rfile["location"], "rb") as f:
+                          contents = b""
+                          if binding.get("loadContents") or compute_checksum:
+                              contents = f.read(CONTENT_LIMIT)
+                          if binding.get("loadContents"):
+                              files["contents"] = contents
+                          if compute_checksum:
+                              checksum = hashlib.sha1()
+                              while contents != b"":
+                                  checksum.update(contents)
+                                  contents = f.read(1024 * 1024)
+                              files["checksum"] = "sha1$%s" % checksum.hexdigest()
+                          f.seek(0, 2)
+                          filesize = f.tell()
+                      files["size"] = filesize
+
+          optional = False
+          single = False
+          if isinstance(schema["type"], list):
+              if "null" in schema["type"]:
+                  optional = True
+              if "File" in schema["type"] or "Directory" in schema["type"]:
+                  single = True
+          elif schema["type"] == "File" or schema["type"] == "Directory":
+              single = True
+
+          if "outputEval" in binding:
+              with SourceLine(binding, "outputEval", WorkflowException, debug):
+                  r = builder.do_eval(binding["outputEval"], context=r)
+
+          if single:
+              if not r and not optional:
+                  with SourceLine(binding, "glob", WorkflowException, debug):
+                      raise WorkflowException("Did not find output file with glob pattern: '{}'".format(globpatterns))
+              elif not r and optional:
+                  pass
+              elif isinstance(r, list):
+                  if len(r) > 1:
+                      raise WorkflowException("Multiple matches for output item that is a single file.")
+                  else:
+                      r = r[0]
+
+          if "secondaryFiles" in schema:
+              with SourceLine(schema, "secondaryFiles", WorkflowException, debug):
+                  for primary in aslist(r):
+                      if isinstance(primary, dict):
+                          primary.setdefault("secondaryFiles", [])
+                          pathprefix = primary["path"][0:primary["path"].rindex("/")+1]
+                          for sf in aslist(schema["secondaryFiles"]):
+                              if isinstance(sf, dict) or "$(" in sf or "${" in sf:
+                                  sfpath = builder.do_eval(sf, context=primary)
+                                  subst = False
+                              else:
+                                  sfpath = sf
+                                  subst = True
+                              for sfitem in aslist(sfpath):
+                                  if isinstance(sfitem, string_types):
+                                      if subst:
+                                          sfitem = {"path": substitute(primary["path"], sfitem)}
+                                      else:
+                                          sfitem = {"path": pathprefix+sfitem}
+                                  if "path" in sfitem and "location" not in sfitem:
+                                      revmap(sfitem)
+                                  if fs_access.isfile(sfitem["location"]):
+                                      sfitem["class"] = "File"
+                                      primary["secondaryFiles"].append(sfitem)
+                                  elif fs_access.isdir(sfitem["location"]):
+                                      sfitem["class"] = "Directory"
+                                      primary["secondaryFiles"].append(sfitem)
+
+          if "format" in schema:
+              for primary in aslist(r):
+                  primary["format"] = builder.do_eval(schema["format"], context=primary)
+
+          # Ensure files point to local references outside of the run environment
+          adjustFileObjs(r, cast(  # known bug in mypy
+              # https://github.com/python/mypy/issues/797
+              Callable[[Any], Any], revmap))
+
+          if not r and optional:
+              r = None
+
+      if (not r and isinstance(schema["type"], dict) and schema["type"]["type"] == "record"):
+          out = {}
+          for f in schema["type"]["fields"]:
+              out[shortname(f["name"])] = self.collect_output(  # type: ignore
+                  f, builder, outdir, fs_access,
+                  compute_checksum=compute_checksum)
+          return out
+      return r
 
 
 class TESTask(object):
